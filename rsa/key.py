@@ -957,7 +957,7 @@ def find_p_q(
         try:
             vP = rsa.core.encrypt_int(p, attack_key.e, attack_key.n)
 
-            def concatenate_in_binary(prev, tail):
+            def padded_concatenation_in_binary(prev, tail):
                 prev = "{0:b}".format(prev)
                 tail = "{0:b}".format(tail)
                 prev = "0" * (int(nbits) - len(prev)) + prev
@@ -965,8 +965,8 @@ def find_p_q(
 
                 return int(prev + tail, 2)
 
-            min_bit_construct_Q = concatenate_in_binary((vP - 1), 0)
-            max_bit_construct_Q = concatenate_in_binary(vP, pow(2, nbits // 2) - 2)
+            min_bit_construct_Q = padded_concatenation_in_binary((vP - 1), 0)
+            max_bit_construct_Q = padded_concatenation_in_binary(vP, pow(2, nbits // 2) - 2)
             lower_bound_Q = (min_bit_construct_Q // p)
             upper_bound_Q = (max_bit_construct_Q // p)
 
