@@ -1,28 +1,25 @@
-import typing
-
 import rsa
-from os.path import exists
 
 
-if not exists("key"):
-    absKey = rsa.key.PublicKey(143, 3)
+def print_private_key(key):
+    print(str({
+        'n': key.n,
+        'e': key.e,
+        'd': key.d,
+        'p': key.p,
+        'q': key.q,
+    }))
 
-    out_file = open("key", "wb")
-    out_file.write(absKey._save_pkcs1_pem())
 
-    out_file.close()
+keyPair = rsa.newkeys(64)
 
-else:
-    in_file = open("key", "rb")
-    key = rsa.key.PublicKey._load_pkcs1_pem(in_file.read())
+publicKey = keyPair[0]
+privateKey = keyPair[1]
 
-    print(key)
+print("P:", privateKey.p)
+print("Q:", privateKey.q)
 
-#
-# keyPair = rsa.newkeys(16)
-#
-# publicKey = keyPair[0]
-# privateKey = keyPair[1]
-#
-# print("P:", privateKey.p)
-# print("Q:", privateKey.q)
+print("Public-Key:", publicKey)
+print_private_key(privateKey)
+
+

