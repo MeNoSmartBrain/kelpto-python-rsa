@@ -1,4 +1,4 @@
-⛔️⛔️⛔️ This is RSA implementation is compromised. Do NOT use is for anything else than demonstration purposes ⛔️⛔️⛔️
+⛔️⛔️⛔️ This is RSA implementation is compromised. Do NOT use is for anything else than demonstration purposes 
 # Kelptographic SETUP attack on python RSA
 
 This project shows an attack asymmetric kleptogrpahic attack on the RSA algorithmen. The project is based on the [python-rsa](https://github.com/sybrenstuvel/python-rsa) package from Sybren A. Stüvel. 
