@@ -14,7 +14,7 @@ __This repsoitory is for demonstration purposes only. Do NOT use it for generati
 
 For installation, clone the repository and install it with pip in development mode:
 ```
-python3 -m pip install ./
+python3 -e pip install ./
 ```
 
 I advice doinng this in a virtual enviroment, which shall be deleted afterwards.
